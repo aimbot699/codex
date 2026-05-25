@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive 3D Solar System</title>
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background-color: #000005;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #fff;
+  user-select: none;
+}
+
+#canvas-container {
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+#planet-labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.planet-label {
+  position: absolute;
+  transform: translate(-50%, -140%);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.95);
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 5, 0.55);
+  border: 1px solid rgba(255,255,255,0.2);
+  pointer-events: auto;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease, transform 0.15s ease;
+  backdrop-filter: blur(4px);
+}
+
+.planet-label:hover {
+  background: rgba(255, 203, 107, 0.35);
+  transform: translate(-50%, -150%);
+}
+
+.planet-label.focused {
+  background: rgba(255, 203, 107, 0.55);
+  border-color: #ffcb6b;
+  color: #000;
+}
+
+.planet-label.dim {
+  opacity: 0.35;
+  font-size: 0.62rem;
+  padding: 2px 7px;
+}
+
+.ui-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  background: rgba(10, 12, 25, 0.72);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 18px;
+  width: 290px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+}
+
+h1 {
+  font-size: 1.1rem;
+  margin: 0 0 6px 0;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #ffcb6b;
+}
+
+p { font-size: 0.78rem; line-height: 1.4; color: #b8c2d0; margin: 4px 0; }
+
+.status-container {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 0.8rem;
+}
+
+.status-indicator {
+  width: 8px; height: 8px; border-radius: 50%;
+  background-color: #ff3b30; margin-right: 8px;
+  box-shadow: 0 0 8px #ff3b30;
+}
+
+.status-indicator.connected {
+  background-color: #4cd964;
+  box-shadow: 0 0 8px #4cd964;
+}
+
+.fallback-controls {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 12px;
+}
+
+.control-group { margin-bottom: 12px; }
+
+label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: #8e8e93;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+
+.value-display {
+  float: right;
+  color: #ffcb6b;
+  font-weight: bold;
+}
+
+.focus-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.focus-btn {
+  font-size: 0.65rem;
+  padding: 5px 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.18s;
+  letter-spacing: 0.5px;
+}
+
+.focus-btn:hover {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.35);
+}
+
+.focus-btn.active {
+  background: #ffcb6b;
+  color: #000;
+  border-color: #ffcb6b;
+  font-weight: bold;
+  box-shadow: 0 0 8px rgba(255,203,107,0.4);
+}
+
+.slider {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #ffcb6b;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(255, 203, 107, 0.6);
+}
+
+.gesture-legend {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.72rem;
+  color: #98a0b0;
+  line-height: 1.5;
+}
+
+.gesture-legend strong { color: #ffcb6b; }
+
+#webcam-container {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10;
+  width: 160px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #000;
+  transform: scaleX(-1);
+}
+
+#webcam { width: 100%; height: 100%; object-fit: cover; }
+
+#canvas-overlay {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+#gesture-hud {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(10, 10, 15, 0.8);
+  padding: 10px 22px;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+  border: 1px solid rgba(255, 203, 107, 0.25);
+  box-shadow: 0 4px 20px rgba(255, 203, 107, 0.12);
+  pointer-events: none;
+  text-align: center;
+}
+
+.highlight { color: #ffcb6b; font-weight: bold; }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+<div id="planet-labels"></div>
+
+<div class="ui-panel">
+  <h1>Solar System</h1>
+  <p>Click any planet name to zoom in. Pinch or use the slider to control distance.</p>
+
+  <div class="status-container">
+    <div id="status-dot" class="status-indicator"></div>
+    <span id="status-text">Starting Camera...</span>
+  </div>
+
+  <div class="fallback-controls">
+    <div class="control-group">
+      <label>Focus On</label>
+      <div class="focus-buttons" id="focus-buttons"></div>
+    </div>
+
+    <div class="control-group">
+      <label>Distance <span class="value-display" id="zoom-value">60</span></label>
+      <input type="range" min="3" max="200" step="1" value="60" class="slider" id="zoom-slider" oninput="setZoom(this.value)">
+    </div>
+
+    <div class="control-group">
+      <label>Orbital Speed <span class="value-display" id="speed-value">1.0x</span></label>
+      <input type="range" min="0" max="3" step="0.05" value="1" class="slider" id="speed-slider" oninput="setSpeed(this.value)">
+    </div>
+
+    <div class="gesture-legend">
+      <strong>Pinch</strong> thumb + index → zoom<br>
+      <strong>Move palm</strong> → orbit the view<br>
+      <strong>Fist</strong> pauses · <strong>Open hand</strong> = fastest
+    </div>
+  </div>
+</div>
+
+<div id="gesture-hud">
+  Focus: <span id="gesture-name" class="highlight">Sun</span>
+</div>
+
+<div id="webcam-container">
+  <video id="webcam" autoplay playsinline></video>
+  <canvas id="canvas-overlay"></canvas>
+</div>
+
+<script>
+// =============================================================================
+// 1. SOLAR SYSTEM DEFINITION (parents come before children)
+// =============================================================================
+const SOLAR_BODIES = [
+  { name: 'Sun',     parentIndex: -1, orbitRadius: 0,    size: 4.0,  color: 0xFFC857, particles: 1500, orbitSpeed: 0,      spinSpeed: 0.0008, particleSize: 0.52, glow: true, mainBody: true },
+  { name: 'Mercury', parentIndex: -1, orbitRadius: 8.0,  size: 0.55, color: 0xA0937D, particles: 260,  orbitSpeed: 0.0040, spinSpeed: 0.0030, particleSize: 0.30, mainBody: true },
+  { name: 'Venus',   parentIndex: -1, orbitRadius: 11.5, size: 0.95, color: 0xE8A95B, particles: 420,  orbitSpeed: 0.0028, spinSpeed: 0.0020, particleSize: 0.32, mainBody: true },
+  { name: 'Earth',   parentIndex: -1, orbitRadius: 15.5, size: 1.05, color: 0x4A90E2, particles: 480,  orbitSpeed: 0.0022, spinSpeed: 0.0035, particleSize: 0.34, mainBody: true },
+  { name: 'Moon',    parentIndex: 3,  orbitRadius: 2.2,  size: 0.30, color: 0xCCCCCC, particles: 110,  orbitSpeed: 0.0150, spinSpeed: 0.0020, particleSize: 0.26 },
+  { name: 'Mars',    parentIndex: -1, orbitRadius: 20.0, size: 0.78, color: 0xCD5C3C, particles: 340,  orbitSpeed: 0.0019, spinSpeed: 0.0028, particleSize: 0.32, mainBody: true },
+  { name: 'Jupiter', parentIndex: -1, orbitRadius: 28.0, size: 2.70, color: 0xD8A87B, particles: 880,  orbitSpeed: 0.0011, spinSpeed: 0.0050, particleSize: 0.42, mainBody: true },
+  { name: 'Io',      parentIndex: 6,  orbitRadius: 3.8,  size: 0.30, color: 0xE8DA75, particles: 85,   orbitSpeed: 0.0220, spinSpeed: 0.0030, particleSize: 0.24 },
+  { name: 'Europa',  parentIndex: 6,  orbitRadius: 4.8,  size: 0.32, color: 0xD0C8B0, particles: 90,   orbitSpeed: 0.0170, spinSpeed: 0.0030, particleSize: 0.24 },
+  { name: 'Ganymede',parentIndex: 6,  orbitRadius: 6.0,  size: 0.38, color: 0xB8AC95, particles: 100,  orbitSpeed: 0.0120, spinSpeed: 0.0030, particleSize: 0.26 },
+  { name: 'Callisto',parentIndex: 6,  orbitRadius: 7.4,  size: 0.36, color: 0x8A7E68, particles: 95,   orbitSpeed: 0.0090, spinSpeed: 0.0030, particleSize: 0.26 },
+  { name: 'Saturn',  parentIndex: -1, orbitRadius: 36.0, size: 2.30, color: 0xF4D29C, particles: 760,  orbitSpeed: 0.0009, spinSpeed: 0.0042, particleSize: 0.40, hasRings: true, mainBody: true },
+  { name: 'Titan',   parentIndex: 11, orbitRadius: 4.8,  size: 0.32, color: 0xC5A368, particles: 95,   orbitSpeed: 0.0130, spinSpeed: 0.0030, particleSize: 0.26 },
+  { name: 'Uranus',  parentIndex: -1, orbitRadius: 44.0, size: 1.55, color: 0x9FE3E3, particles: 520,  orbitSpeed: 0.0007, spinSpeed: 0.0032, particleSize: 0.36, mainBody: true },
+  { name: 'Neptune', parentIndex: -1, orbitRadius: 52.0, size: 1.45, color: 0x4661D2, particles: 500,  orbitSpeed: 0.0005, spinSpeed: 0.0030, particleSize: 0.36, mainBody: true }
+];
+
+const SATURN_RING_PARTICLES = 900;
+const STAR_PARTICLES = 2000;
+const SATURN_RING_FLAG = 1000;
+const STAR_FLAG = -1;
+
+let PARTICLE_COUNT = 0;
+SOLAR_BODIES.forEach(b => PARTICLE_COUNT += b.particles);
+PARTICLE_COUNT += SATURN_RING_PARTICLES + STAR_PARTICLES;
+
+// Three.js handles
+let scene, camera, renderer;
+let particleGeometry, particleSystem;
+
+// Per-particle data
+let particleBodyId, particleLocalX, particleLocalY, particleLocalZ;
+let particleSizes;
+let currentPositions, currentColors;
+
+// Per-body state
+let bodyOrbitAngle, bodySpinAngle;
+const bodyCenterX = new Float32Array(SOLAR_BODIES.length);
+const bodyCenterY = new Float32Array(SOLAR_BODIES.length);
+const bodyCenterZ = new Float32Array(SOLAR_BODIES.length);
+
+// Interaction state
+let currentZoom = 60;
+let targetZoom = 60;
+let viewAngleX = 0.35;
+let viewAngleY = 0;
+let targetViewAngleX = 0.35;
+let targetViewAngleY = 0;
+let speedMultiplier = 1.0;
+let targetSpeedMultiplier = 1.0;
+let isHandActive = false;
+let lastHandTime = 0;
+
+// Focus state
+let focusedIndex = 0;
+const focusTarget = new THREE.Vector3(0, 0, 0);
+const smoothFocusTarget = new THREE.Vector3(0, 0, 0);
+
+// Planet labels (HTML divs)
+const planetLabels = [];
+
+// =============================================================================
+// 2. THREE.JS INITIALIZATION
+// =============================================================================
+function initThree() {
+  const container = document.getElementById('canvas-container');
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x000010, 0.002);
+
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.up.set(0, 1, 0);
+  updateCameraPosition();
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(renderer.domElement);
+
+  buildParticleSystem();
+  buildOrbitLines();
+  setupMouseControls();
+
+  window.addEventListener('resize', onWindowResize);
+}
+
+function updateCameraPosition() {
+  const cosX = Math.cos(viewAngleX);
+  const offsetX = Math.sin(viewAngleY) * cosX * currentZoom;
+  const offsetY = Math.sin(viewAngleX) * currentZoom;
+  const offsetZ = Math.cos(viewAngleY) * cosX * currentZoom;
+  camera.position.set(
+    smoothFocusTarget.x + offsetX,
+    smoothFocusTarget.y + offsetY,
+    smoothFocusTarget.z + offsetZ
+  );
+  camera.lookAt(smoothFocusTarget);
+}
+
+function setupMouseControls() {
+  let isDragging = false;
+  let lastX = 0, lastY = 0;
+
+  renderer.domElement.addEventListener('mousedown', (e) => {
+    if (isHandActive) return;
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => isDragging = false);
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging || isHandActive) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    targetViewAngleY -= dx * 0.005;
+    targetViewAngleX += dy * 0.005;
+    targetViewAngleX = THREE.MathUtils.clamp(targetViewAngleX, -1.2, 1.2);
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+  renderer.domElement.addEventListener('wheel', (e) => {
+    if (isHandActive) return;
+    e.preventDefault();
+    targetZoom += e.deltaY * 0.06;
+    targetZoom = THREE.MathUtils.clamp(targetZoom, 3, 200);
+    syncZoomUI();
+  }, { passive: false });
+}
+
+// =============================================================================
+// 3. PARTICLE SYSTEM
+// =============================================================================
+function buildParticleSystem() {
+  particleGeometry = new THREE.BufferGeometry();
+
+  particleBodyId = new Int32Array(PARTICLE_COUNT);
+  particleLocalX = new Float32Array(PARTICLE_COUNT);
+  particleLocalY = new Float32Array(PARTICLE_COUNT);
+  particleLocalZ = new Float32Array(PARTICLE_COUNT);
+  particleSizes  = new Float32Array(PARTICLE_COUNT);
+  currentPositions = new Float32Array(PARTICLE_COUNT * 3);
+  currentColors    = new Float32Array(PARTICLE_COUNT * 3);
+
+  bodyOrbitAngle = new Float32Array(SOLAR_BODIES.length);
+  bodySpinAngle  = new Float32Array(SOLAR_BODIES.length);
+  for (let i = 0; i < SOLAR_BODIES.length; i++) {
+    bodyOrbitAngle[i] = Math.random() * Math.PI * 2;
+  }
+
+  let pIdx = 0;
+  const tempColor = new THREE.Color();
+
+  // Bodies (sun, planets, moons)
+  SOLAR_BODIES.forEach((body, bodyIndex) => {
+    const base = new THREE.Color(body.color);
+    for (let i = 0; i < body.particles; i++) {
+      const u = Math.random();
+      const v = Math.random();
+      const theta = u * 2.0 * Math.PI;
+      const phi = Math.acos(2.0 * v - 1.0);
+      const r = body.size * (0.88 + Math.random() * 0.12);
+
+      particleBodyId[pIdx] = bodyIndex;
+      particleLocalX[pIdx] = r * Math.sin(phi) * Math.cos(theta);
+      particleLocalY[pIdx] = r * Math.sin(phi) * Math.sin(theta);
+      particleLocalZ[pIdx] = r * Math.cos(phi);
+      particleSizes[pIdx]  = body.particleSize;
+
+      tempColor.copy(base);
+      const variation = (Math.random() - 0.5) * 0.18;
+      tempColor.r = Math.min(1, Math.max(0, tempColor.r + variation));
+      tempColor.g = Math.min(1, Math.max(0, tempColor.g + variation));
+      tempColor.b = Math.min(1, Math.max(0, tempColor.b + variation));
+
+      if (body.glow) {
+        const hot = Math.random();
+        tempColor.r = 1.0;
+        tempColor.g = 0.72 + hot * 0.28;
+        tempColor.b = 0.20 + hot * 0.30;
+        particleSizes[pIdx] = 0.45 + Math.random() * 0.30;
+      }
+
+      currentColors[pIdx * 3]     = tempColor.r;
+      currentColors[pIdx * 3 + 1] = tempColor.g;
+      currentColors[pIdx * 3 + 2] = tempColor.b;
+      pIdx++;
+    }
+  });
+
+  // Saturn rings
+  const saturnIndex = SOLAR_BODIES.findIndex(b => b.name === 'Saturn');
+  const saturn = SOLAR_BODIES[saturnIndex];
+  for (let i = 0; i < SATURN_RING_PARTICLES; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const ringFrac = Math.random();
+    const innerR = saturn.size * 1.5;
+    const outerR = saturn.size * 2.9;
+    const r = innerR + ringFrac * (outerR - innerR);
+
+    particleBodyId[pIdx] = SATURN_RING_FLAG + saturnIndex;
+    particleLocalX[pIdx] = r * Math.cos(angle);
+    particleLocalY[pIdx] = (Math.random() - 0.5) * 0.18;
+    particleLocalZ[pIdx] = r * Math.sin(angle);
+    particleSizes[pIdx]  = 0.20 + Math.random() * 0.14;
+
+    const shade = 0.6 + Math.random() * 0.4;
+    currentColors[pIdx * 3]     = shade * 0.85;
+    currentColors[pIdx * 3 + 1] = shade * 0.72;
+    currentColors[pIdx * 3 + 2] = shade * 0.52;
+    pIdx++;
+  }
+
+  // Background stars
+  for (let i = 0; i < STAR_PARTICLES; i++) {
+    const r = 150 + Math.random() * 130;
+    const u = Math.random();
+    const v = Math.random();
+    const theta = u * 2.0 * Math.PI;
+    const phi = Math.acos(2.0 * v - 1.0);
+
+    particleBodyId[pIdx] = STAR_FLAG;
+    particleLocalX[pIdx] = r * Math.sin(phi) * Math.cos(theta);
+    particleLocalY[pIdx] = r * Math.sin(phi) * Math.sin(theta);
+    particleLocalZ[pIdx] = r * Math.cos(phi);
+    particleSizes[pIdx]  = 0.10 + Math.random() * 0.20;
+
+    const tint = Math.random();
+    const brightness = 0.45 + Math.random() * 0.55;
+    if (tint < 0.7) {
+      currentColors[pIdx * 3]     = brightness;
+      currentColors[pIdx * 3 + 1] = brightness;
+      currentColors[pIdx * 3 + 2] = brightness;
+    } else if (tint < 0.88) {
+      currentColors[pIdx * 3]     = brightness;
+      currentColors[pIdx * 3 + 1] = brightness * 0.8;
+      currentColors[pIdx * 3 + 2] = brightness * 0.55;
+    } else {
+      currentColors[pIdx * 3]     = brightness * 0.65;
+      currentColors[pIdx * 3 + 1] = brightness * 0.8;
+      currentColors[pIdx * 3 + 2] = brightness;
+    }
+    pIdx++;
+  }
+
+  particleGeometry.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
+  particleGeometry.setAttribute('color',    new THREE.BufferAttribute(currentColors, 3));
+  particleGeometry.setAttribute('size',     new THREE.BufferAttribute(particleSizes, 1));
+
+  const pTexture = createCircularGradientTexture();
+  const pMaterial = new THREE.ShaderMaterial({
+    uniforms: { pointTexture: { value: pTexture } },
+    vertexShader: `
+      attribute float size;
+      varying vec3 vColor;
+      void main() {
+        vColor = color;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        float ps = size * (340.0 / -mvPosition.z);
+        gl_PointSize = clamp(ps, 1.0, 90.0);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D pointTexture;
+      varying vec3 vColor;
+      void main() {
+        vec4 tex = texture2D(pointTexture, gl_PointCoord);
+        gl_FragColor = vec4(vColor, 1.0) * tex;
+        if (gl_FragColor.a < 0.02) discard;
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    vertexColors: true
+  });
+
+  particleSystem = new THREE.Points(particleGeometry, pMaterial);
+  scene.add(particleSystem);
+}
+
+function createCircularGradientTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gradient.addColorStop(0.0, 'rgba(255, 255, 255, 1)');
+  gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.55)');
+  gradient.addColorStop(1.0, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 32, 32);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function buildOrbitLines() {
+  SOLAR_BODIES.forEach((body, i) => {
+    if (body.parentIndex !== -1 || body.orbitRadius <= 0) return;
+    const points = [];
+    const segments = 160;
+    for (let s = 0; s <= segments; s++) {
+      const a = (s / segments) * Math.PI * 2;
+      points.push(new THREE.Vector3(Math.cos(a) * body.orbitRadius, 0, Math.sin(a) * body.orbitRadius));
+    }
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({ color: 0x334466, transparent: true, opacity: 0.28 });
+    const line = new THREE.LineLoop(geom, mat);
+    scene.add(line);
+  });
+}
+
+// =============================================================================
+// 4. PLANET LABELS & FOCUS
+// =============================================================================
+function createPlanetLabels() {
+  const container = document.getElementById('planet-labels');
+  SOLAR_BODIES.forEach((body, i) => {
+    const div = document.createElement('div');
+    div.className = 'planet-label';
+    if (!body.mainBody) div.classList.add('dim');
+    div.textContent = body.name;
+    div.style.borderColor = '#' + body.color.toString(16).padStart(6, '0');
+    div.addEventListener('click', () => focusOnBody(i));
+    container.appendChild(div);
+    planetLabels.push(div);
+  });
+  planetLabels[0].classList.add('focused');
+}
+
+function createFocusButtons() {
+  const container = document.getElementById('focus-buttons');
+  SOLAR_BODIES.forEach((body, i) => {
+    if (!body.mainBody) return;
+    const btn = document.createElement('button');
+    btn.className = 'focus-btn';
+    btn.textContent = body.name;
+    btn.id = `focus-btn-${i}`;
+    if (i === 0) btn.classList.add('active');
+    btn.addEventListener('click', () => focusOnBody(i));
+    container.appendChild(btn);
+  });
+}
+
+function focusOnBody(idx) {
+  focusedIndex = idx;
+  const body = SOLAR_BODIES[idx];
+  // Auto-pick a nice viewing distance for this body
+  let z;
+  if (body.name === 'Sun') z = 60;
+  else if (body.hasRings) z = Math.max(body.size * 4.5, 12);
+  else if (body.name === 'Jupiter') z = Math.max(body.size * 4.5, 14);
+  else z = Math.max(body.size * 5, 5);
+  targetZoom = z;
+  syncZoomUI();
+
+  // UI updates
+  planetLabels.forEach((lbl, i) => lbl.classList.toggle('focused', i === idx));
+  document.querySelectorAll('.focus-btn').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.getElementById(`focus-btn-${idx}`);
+  if (activeBtn) activeBtn.classList.add('active');
+  document.getElementById('gesture-name').innerText = body.name;
+}
+
+const _tempVec = new THREE.Vector3();
+function updatePlanetLabels() {
+  for (let i = 0; i < SOLAR_BODIES.length; i++) {
+    _tempVec.set(bodyCenterX[i], bodyCenterY[i], bodyCenterZ[i]);
+    _tempVec.project(camera);
+    if (_tempVec.z > 1 || _tempVec.z < -1 || _tempVec.x < -1.2 || _tempVec.x > 1.2 || _tempVec.y < -1.2 || _tempVec.y > 1.2) {
+      planetLabels[i].style.display = 'none';
+      continue;
+    }
+    const sx = (_tempVec.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-_tempVec.y * 0.5 + 0.5) * window.innerHeight;
+    planetLabels[i].style.display = 'block';
+    planetLabels[i].style.left = sx + 'px';
+    planetLabels[i].style.top  = sy + 'px';
+  }
+}
+
+function setZoom(val) {
+  targetZoom = parseFloat(val);
+  document.getElementById('zoom-value').innerText = Math.round(targetZoom);
+}
+
+function setSpeed(val) {
+  targetSpeedMultiplier = parseFloat(val);
+  document.getElementById('speed-value').innerText = targetSpeedMultiplier.toFixed(2) + 'x';
+}
+
+function syncZoomUI() {
+  document.getElementById('zoom-slider').value = targetZoom;
+  document.getElementById('zoom-value').innerText = Math.round(targetZoom);
+}
+
+function syncSpeedUI() {
+  document.getElementById('speed-slider').value = targetSpeedMultiplier;
+  document.getElementById('speed-value').innerText = targetSpeedMultiplier.toFixed(2) + 'x';
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// =============================================================================
+// 5. HAND TRACKING — smoothing & stability
+// =============================================================================
+const videoElement   = document.getElementById('webcam');
+const overlayCanvas  = document.getElementById('canvas-overlay');
+const overlayCtx     = overlayCanvas.getContext('2d');
+const statusDot      = document.getElementById('status-dot');
+const statusText     = document.getElementById('status-text');
+const gestureNameHUD = document.getElementById('gesture-name');
+
+// Smoothed landmarks via exponential moving average
+let smoothedLandmarks = null;
+const LANDMARK_ALPHA = 0.35;
+
+// Finger count stability
+const FINGER_HISTORY_LEN = 6;
+const fingerCountHistory = [];
+let stableFingerCount = 5;
+
+// Pinch baseline (smoothed)
+let smoothedPinch = 0.15;
+let lastFocusGesture = -1;
+
+function smoothLandmarks(raw) {
+  if (!smoothedLandmarks) {
+    smoothedLandmarks = raw.map(p => ({ x: p.x, y: p.y, z: p.z }));
+    return smoothedLandmarks;
+  }
+  for (let i = 0; i < 21; i++) {
+    smoothedLandmarks[i].x = smoothedLandmarks[i].x * (1 - LANDMARK_ALPHA) + raw[i].x * LANDMARK_ALPHA;
+    smoothedLandmarks[i].y = smoothedLandmarks[i].y * (1 - LANDMARK_ALPHA) + raw[i].y * LANDMARK_ALPHA;
+    smoothedLandmarks[i].z = smoothedLandmarks[i].z * (1 - LANDMARK_ALPHA) + raw[i].z * LANDMARK_ALPHA;
+  }
+  return smoothedLandmarks;
+}
+
+function dist3(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function dist2(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function updateStableFingerCount(rawCount) {
+  fingerCountHistory.push(rawCount);
+  if (fingerCountHistory.length > FINGER_HISTORY_LEN) fingerCountHistory.shift();
+  const counts = {};
+  for (const c of fingerCountHistory) counts[c] = (counts[c] || 0) + 1;
+  let mode = stableFingerCount;
+  let maxCount = 0;
+  for (const k in counts) {
+    if (counts[k] > maxCount) {
+      maxCount = counts[k];
+      mode = parseInt(k);
+    }
+  }
+  if (maxCount >= 4) stableFingerCount = mode;
+  return stableFingerCount;
+}
+
+function onResults(results) {
+  if (overlayCanvas.width !== videoElement.videoWidth || overlayCanvas.height !== videoElement.videoHeight) {
+    overlayCanvas.width = videoElement.videoWidth;
+    overlayCanvas.height = videoElement.videoHeight;
+  }
+  overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+  const now = performance.now();
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    lastHandTime = now;
+    if (!isHandActive) isHandActive = true;
+    statusDot.classList.add('connected');
+    statusText.innerText = 'Hand Tracking Active';
+
+    const raw = results.multiHandLandmarks[0];
+    const smoothed = smoothLandmarks(raw);
+    drawSkeletalHand(smoothed);
+    processGestures(smoothed);
+  } else {
+    // Keep hand state alive briefly to ride out detection flickers
+    if (isHandActive && (now - lastHandTime) > 450) {
+      isHandActive = false;
+      smoothedLandmarks = null;
+      fingerCountHistory.length = 0;
+      statusDot.classList.remove('connected');
+      statusText.innerText = 'Searching for hand...';
+    }
+  }
+}
+
+function drawSkeletalHand(landmarks) {
+  overlayCtx.fillStyle = '#ffcb6b';
+  overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+  overlayCtx.lineWidth = 2;
+  const connections = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [9,10],[10,11],[11,12],
+    [13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20],
+    [5,9],[9,13],[13,17]
+  ];
+  connections.forEach(pair => {
+    const a = landmarks[pair[0]];
+    const b = landmarks[pair[1]];
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(a.x * overlayCanvas.width, a.y * overlayCanvas.height);
+    overlayCtx.lineTo(b.x * overlayCanvas.width, b.y * overlayCanvas.height);
+    overlayCtx.stroke();
+  });
+  for (let i = 0; i < landmarks.length; i++) {
+    overlayCtx.beginPath();
+    overlayCtx.arc(landmarks[i].x * overlayCanvas.width, landmarks[i].y * overlayCanvas.height, 3.5, 0, Math.PI * 2);
+    overlayCtx.fill();
+  }
+}
+
+function processGestures(lm) {
+  const wrist     = lm[0];
+  const thumbTip  = lm[4];
+  const thumbIP   = lm[3];
+  const indexMCP  = lm[5];
+  const indexPip  = lm[6];
+  const indexTip  = lm[8];
+  const middleMCP = lm[9];
+  const middlePip = lm[10];
+  const middleTip = lm[12];
+  const ringMCP   = lm[13];
+  const ringPip   = lm[14];
+  const ringTip   = lm[16];
+  const pinkyMCP  = lm[17];
+  const pinkyPip  = lm[18];
+  const pinkyTip  = lm[20];
+
+  // Palm position → camera orbit angles
+  targetViewAngleY = (middleMCP.x - 0.5) * Math.PI * 1.4;
+  targetViewAngleX = THREE.MathUtils.clamp(-(middleMCP.y - 0.5) * Math.PI * 0.9, -1.2, 1.2);
+
+  // Pinch (thumb tip ↔ index tip) → smoothed distance → zoom
+  const rawPinch = dist3(thumbTip, indexTip);
+  smoothedPinch = smoothedPinch * 0.6 + rawPinch * 0.4;
+  // Pinched (~0.03) → close in (3). Stretched (~0.30) → far out (180).
+  let z = THREE.MathUtils.mapLinear(smoothedPinch, 0.03, 0.30, 3, 180);
+  z = THREE.MathUtils.clamp(z, 3, 200);
+  targetZoom = z;
+  syncZoomUI();
+
+  // Finger extension: tip-to-MCP must be > pip-to-MCP * threshold
+  const idxExt   = dist2(indexTip,  indexMCP)  > dist2(indexPip,  indexMCP)  * 1.25;
+  const midExt   = dist2(middleTip, middleMCP) > dist2(middlePip, middleMCP) * 1.25;
+  const ringExt  = dist2(ringTip,   ringMCP)   > dist2(ringPip,   ringMCP)   * 1.25;
+  const pinkyExt = dist2(pinkyTip,  pinkyMCP)  > dist2(pinkyPip,  pinkyMCP)  * 1.25;
+  const thumbExt = dist2(thumbTip,  indexMCP)  > dist2(thumbIP,   indexMCP)  * 1.15;
+
+  let rawFingers = 0;
+  if (idxExt)   rawFingers++;
+  if (midExt)   rawFingers++;
+  if (ringExt)  rawFingers++;
+  if (pinkyExt) rawFingers++;
+  if (thumbExt) rawFingers++;
+
+  const fingers = updateStableFingerCount(rawFingers);
+
+  // Speed control from finger count
+  let speed = 1.0;
+  let speedLabel = '';
+  if (fingers === 0)      { speed = 0.0; speedLabel = 'Paused'; }
+  else if (fingers === 1) { speed = 0.25; speedLabel = 'Very Slow'; }
+  else if (fingers === 2) { speed = 0.5;  speedLabel = 'Slow'; }
+  else if (fingers === 3) { speed = 1.0;  speedLabel = 'Normal'; }
+  else if (fingers === 4) { speed = 1.8;  speedLabel = 'Fast'; }
+  else                    { speed = 2.6;  speedLabel = 'Fastest'; }
+  targetSpeedMultiplier = speed;
+  syncSpeedUI();
+
+  // Update HUD
+  const focusName = SOLAR_BODIES[focusedIndex].name;
+  gestureNameHUD.innerHTML = `<span class="highlight">${focusName}</span> · ${speedLabel} · Zoom ${Math.round(z)}`;
+}
+
+function initMediaPipe() {
+  const hands = new Hands({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+  });
+  hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.7,
+    minTrackingConfidence: 0.6
+  });
+  hands.onResults(onResults);
+
+  const cameraHelper = new Camera(videoElement, {
+    onFrame: async () => { await hands.send({ image: videoElement }); },
+    width: 320,
+    height: 240
+  });
+
+  cameraHelper.start()
+    .then(() => {
+      statusText.innerText = 'Camera Ready';
+      statusDot.classList.add('connected');
+    })
+    .catch(err => {
+      console.warn('Webcam unavailable.', err);
+      statusText.innerText = 'No Camera (Use Sliders)';
+    });
+}
+
+// =============================================================================
+// 6. RENDER LOOP
+// =============================================================================
+function animate() {
+  requestAnimationFrame(animate);
+
+  // Smooth interaction state
+  currentZoom     += (targetZoom - currentZoom) * 0.07;
+  viewAngleX      += (targetViewAngleX - viewAngleX) * 0.06;
+  viewAngleY      += (targetViewAngleY - viewAngleY) * 0.06;
+  speedMultiplier += (targetSpeedMultiplier - speedMultiplier) * 0.05;
+
+  // Advance body orbits & spins, compute hierarchical centers
+  for (let i = 0; i < SOLAR_BODIES.length; i++) {
+    const body = SOLAR_BODIES[i];
+    bodyOrbitAngle[i] += body.orbitSpeed * speedMultiplier;
+    bodySpinAngle[i]  += body.spinSpeed  * speedMultiplier;
+
+    const localX = Math.cos(bodyOrbitAngle[i]) * body.orbitRadius;
+    const localZ = Math.sin(bodyOrbitAngle[i]) * body.orbitRadius;
+
+    if (body.parentIndex === -1) {
+      bodyCenterX[i] = localX;
+      bodyCenterY[i] = 0;
+      bodyCenterZ[i] = localZ;
+    } else {
+      bodyCenterX[i] = bodyCenterX[body.parentIndex] + localX;
+      bodyCenterY[i] = bodyCenterY[body.parentIndex];
+      bodyCenterZ[i] = bodyCenterZ[body.parentIndex] + localZ;
+    }
+  }
+
+  // Update focus target to follow the focused body
+  focusTarget.set(bodyCenterX[focusedIndex], bodyCenterY[focusedIndex], bodyCenterZ[focusedIndex]);
+  smoothFocusTarget.lerp(focusTarget, 0.12);
+
+  // Re-aim camera relative to the focused body
+  updateCameraPosition();
+
+  // Update particle positions
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const i3 = i * 3;
+    const bid = particleBodyId[i];
+
+    if (bid === STAR_FLAG) {
+      currentPositions[i3]     = particleLocalX[i];
+      currentPositions[i3 + 1] = particleLocalY[i];
+      currentPositions[i3 + 2] = particleLocalZ[i];
+    } else if (bid >= SATURN_RING_FLAG) {
+      const realBid = bid - SATURN_RING_FLAG;
+      const spin = bodySpinAngle[realBid] * 0.15;
+      const lx = particleLocalX[i];
+      const ly = particleLocalY[i];
+      const lz = particleLocalZ[i];
+      const rx = lx * Math.cos(spin) - lz * Math.sin(spin);
+      const rz = lx * Math.sin(spin) + lz * Math.cos(spin);
+      currentPositions[i3]     = bodyCenterX[realBid] + rx;
+      currentPositions[i3 + 1] = bodyCenterY[realBid] + ly;
+      currentPositions[i3 + 2] = bodyCenterZ[realBid] + rz;
+    } else {
+      const spin = bodySpinAngle[bid];
+      const lx = particleLocalX[i];
+      const ly = particleLocalY[i];
+      const lz = particleLocalZ[i];
+      const rx = lx * Math.cos(spin) - lz * Math.sin(spin);
+      const rz = lx * Math.sin(spin) + lz * Math.cos(spin);
+      currentPositions[i3]     = bodyCenterX[bid] + rx;
+      currentPositions[i3 + 1] = bodyCenterY[bid] + ly;
+      currentPositions[i3 + 2] = bodyCenterZ[bid] + rz;
+    }
+  }
+  particleGeometry.attributes.position.needsUpdate = true;
+
+  updatePlanetLabels();
+
+  renderer.render(scene, camera);
+}
+
+// =============================================================================
+// 7. START
+// =============================================================================
+window.addEventListener('DOMContentLoaded', () => {
+  initThree();
+  createPlanetLabels();
+  createFocusButtons();
+  focusOnBody(0);
+  animate();
+  initMediaPipe();
+});
+</script>
+</body>
+</html>
